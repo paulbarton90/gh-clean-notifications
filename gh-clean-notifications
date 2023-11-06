@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -e
+
+
+QUERY='query NotificationsQuery($first: Int!, $endCursor: String, $miscQuery: String) {
+  viewer {
+    notificationThreads(first: $first, after: $endCursor, query: $miscQuery) {
+      totalCount
+      pageInfo {
+        hasNextPage endCursor
+      }
+      nodes {
+        id title subject {
+          __typename ... on PullRequest {
+            state resourcePath
+          }
+          ... on Issue {
+            state resourcePath
+          }
+          ... on Discussion {
+            isAnswered resourcePath
+          }
+        }
+      }
+    }
+  }
+}
+'
+
+data=$(gh api graphql \
+  -F first=50 -F miscQuery=' null' \
+  -f query="${QUERY}" \
+  --paginate \
+  -q '.data.viewer.notificationThreads.nodes[] | select(.subject.state == ("CLOSED","MERGED")) | {"id":.id,"title":.title,"path":.subject.resourcePath}'
+)
+
+readarray -t my_array < <(echo "${data}" | jq -s -c '.[]')
+
+MARK_IDS_AS_DONE_QUERY='
+  mutation MarkNotificationsAsDone($ids: [ID!]!) {
+    markNotificationsAsDone(input: {ids: $ids}) {
+      success
+    }
+  }
+'
+
+# If there are IDs, mark them as done.
+if [ ${#my_array[@]} -gt 0 ]; then
+  IDS=()
+  for item in "${my_array[@]}"; do
+    echo Marking as Done: $(echo $item | jq -r .title)
+    echo "                 "https://github.com$(echo $item | jq -r .path)
+    IDS+=("-f ids[]=$(echo $item | jq -r .id)")
+  done
+
+  gh api graphql --silent \
+    ${IDS[@]} \
+    -f query="${MARK_IDS_AS_DONE_QUERY}"
+else
+  echo "No tasks to mark as done!"
+fi
