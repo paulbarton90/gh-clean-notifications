@@ -81,7 +81,7 @@ process_notifications() {
 }
 
 
-while getopts h:q:l:v flag
+while getopts :hq:l:v flag
 do
   case "${flag}" in
     h)  # Display help
@@ -103,11 +103,11 @@ do
     v)  # Do verbose messages
       VERBOSE=1;;
 
-    \?)  # Unknown query
-      echo "Error: Invalid option"
-      echo ""
+    \?)
+      echo "Error: Invalid option was specified." >&2;
+      echo "" >&2
       help
-      exit;;
+      exit 2;;
   esac
 done
 
