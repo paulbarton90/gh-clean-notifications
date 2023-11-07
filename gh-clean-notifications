@@ -2,7 +2,7 @@
 set -e
 
 
-QUERY='query NotificationsQuery($first: Int!, $endCursor: String, $miscQuery: String) {
+NOTIFICATION_QUERY='query NotificationsQuery($first: Int!, $endCursor: String, $miscQuery: String) {
   viewer {
     notificationThreads(first: $first, after: $endCursor, query: $miscQuery) {
       totalCount
@@ -27,15 +27,6 @@ QUERY='query NotificationsQuery($first: Int!, $endCursor: String, $miscQuery: St
 }
 '
 
-data=$(gh api graphql \
-  -F first=50 -F miscQuery=' null' \
-  -f query="${QUERY}" \
-  --paginate \
-  -q '.data.viewer.notificationThreads.nodes[] | select(.subject.state == ("CLOSED","MERGED")) | {"id":.id,"title":.title,"path":.subject.resourcePath}'
-)
-
-readarray -t my_array < <(echo "${data}" | jq -s -c '.[]')
-
 MARK_IDS_AS_DONE_QUERY='
   mutation MarkNotificationsAsDone($ids: [ID!]!) {
     markNotificationsAsDone(input: {ids: $ids}) {
@@ -44,18 +35,86 @@ MARK_IDS_AS_DONE_QUERY='
   }
 '
 
-# If there are IDs, mark them as done.
-if [ ${#my_array[@]} -gt 0 ]; then
-  IDS=()
-  for item in "${my_array[@]}"; do
-    echo Marking as Done: $(echo $item | jq -r .title)
-    echo "                 "https://github.com$(echo $item | jq -r .path)
-    IDS+=("-f ids[]=$(echo $item | jq -r .id)")
-  done
+BASE_QUERY="is:unread is:read"
+BASE_LIMIT=50
+VERBOSE=0
 
-  gh api graphql --silent \
-    ${IDS[@]} \
-    -f query="${MARK_IDS_AS_DONE_QUERY}"
-else
-  echo "No tasks to mark as done!"
+help() {
+  echo "gh clean-notifications"
+  echo "Cleans up merged and closed items from notifications in github."
+  echo "Syntax: gh clean-notifications [-h|-q|-l]"
+  echo ""
+  echo "Options:"
+  echo " -h -> Help"
+  echo " -q -> Query to pass onto getting notifications"
+  echo "       Same as available here: https://github.com/notifications"
+  echo "       Default: is:unread is:read"
+  echo " -l -> Limit on pagination. Default 50."
+  echo " -v -> Verbose messaging."
+}
+
+process_notifications() {
+  data=$(gh api graphql \
+    -F first=${BASE_LIMIT} -F miscQuery="${BASE_QUERY}" \
+    -f query="${NOTIFICATION_QUERY}" \
+    --paginate \
+    -q '.data.viewer.notificationThreads.nodes[] | select(.subject.state == ("CLOSED","MERGED")) | {"id":.id,"title":.title,"path":.subject.resourcePath}'
+  )
+
+  readarray -t my_array < <(echo "${data}" | jq -s -c '.[]')
+
+  # If there are IDs, mark them as done.
+  if [ ${#my_array[@]} -gt 0 ]; then
+    IDS=()
+    for item in "${my_array[@]}"; do
+      echo Marking as Done: $(echo $item | jq -r .title)
+      echo "                 "https://github.com$(echo $item | jq -r .path)
+      IDS+=("-f ids[]=$(echo $item | jq -r .id)")
+    done
+
+    gh api graphql --silent \
+      ${IDS[@]} \
+      -f query="${MARK_IDS_AS_DONE_QUERY}"
+  else
+    echo "No tasks to mark as done!"
+  fi
+}
+
+
+while getopts h:q:l:v flag
+do
+  case "${flag}" in
+    h)  # Display help
+      help
+      exit;;
+
+    q)  # Update default query
+      BASE_QUERY=${OPTARG};;
+
+    l)  # Update base limit
+      value=${OPTARG}
+      re='^[0-9]+$'
+      if ! [[ $value =~ $re ]] ; then
+        echo "-l wasn't set to a number: ${value}" >&2;
+        exit 1;
+      fi
+      BASE_LIMIT=${value};;
+
+    v)  # Do verbose messages
+      VERBOSE=1;;
+
+    \?)  # Unknown query
+      echo "Error: Invalid option"
+      echo ""
+      help
+      exit;;
+  esac
+done
+
+if [ ${VERBOSE} -gt 0 ]; then
+  echo "Input arguments are:"
+  echo "Query: ${BASE_QUERY}"
+  echo "Limit: ${BASE_LIMIT}"
 fi
+
+process_notifications
