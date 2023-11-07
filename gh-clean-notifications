@@ -2,9 +2,9 @@
 set -e
 
 
-NOTIFICATION_QUERY='query NotificationsQuery($first: Int!, $endCursor: String, $miscQuery: String) {
+NOTIFICATION_QUERY="query NotificationsQuery(\$first: Int!, \$endCursor: String, \$miscQuery: String) {
   viewer {
-    notificationThreads(first: $first, after: $endCursor, query: $miscQuery) {
+    notificationThreads(first: \$first, after: \$endCursor, query: \$miscQuery) {
       totalCount
       pageInfo {
         hasNextPage endCursor
@@ -25,15 +25,15 @@ NOTIFICATION_QUERY='query NotificationsQuery($first: Int!, $endCursor: String, $
     }
   }
 }
-'
+"
 
-MARK_IDS_AS_DONE_QUERY='
-  mutation MarkNotificationsAsDone($ids: [ID!]!) {
-    markNotificationsAsDone(input: {ids: $ids}) {
+MARK_IDS_AS_DONE_QUERY="
+  mutation MarkNotificationsAsDone(\$ids: [ID!]!) {
+    markNotificationsAsDone(input: {ids: \$ids}) {
       success
     }
   }
-'
+"
 
 BASE_QUERY="is:unread is:read"
 BASE_LIMIT=50
@@ -67,14 +67,13 @@ process_notifications() {
   if [ ${#my_array[@]} -gt 0 ]; then
     IDS=()
     for item in "${my_array[@]}"; do
-      echo Marking as Done: $(echo $item | jq -r .title)
-      echo "                 "https://github.com$(echo $item | jq -r .path)
-      IDS+=("-f ids[]=$(echo $item | jq -r .id)")
+      echo "Marking as Done: $(echo "${item}" | jq -r .title)"
+      echo "                 https://github.com$(echo "${item}" | jq -r .path)"
+      IDS+=(-f "ids[]=$(echo "${item}" | jq -r .id)")
     done
 
-    gh api graphql --silent \
-      ${IDS[@]} \
-      -f query="${MARK_IDS_AS_DONE_QUERY}"
+    gh api graphql --silent "${IDS[@]}" -f query="${MARK_IDS_AS_DONE_QUERY}"
+
   else
     echo "No tasks to mark as done!"
   fi
