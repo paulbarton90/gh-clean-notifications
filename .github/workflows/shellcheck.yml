@@ -1,0 +1,14 @@
+---
+name: shellcheck
+
+on:
+  - push
+
+jobs:
+  docker:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run shellcheck on gh-clean-notifications
+        run: shellcheck gh-clean-notifications
