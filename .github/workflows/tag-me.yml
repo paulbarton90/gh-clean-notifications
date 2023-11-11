@@ -1,0 +1,67 @@
+---
+name: tag-me
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  seymour:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_FILE: gh-clean-notifications
+    steps:
+      - name: Configure gh
+        run: |
+          gh config set prompt disabled
+      - name: Get github repo name
+        run: |
+          echo REPO_NAME=$(gh api repos/${{ github.repository }} -q '.name') >> $GITHUB_ENV
+      - name: Gather tag information
+        run: |
+          gh api graphql -f query='
+            query ($owner: String!, $name: String!, $tag: String, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                refs(refPrefix: "refs/tags/", query: $tag, first: 5, after: $endCursor, orderBy: {field: TAG_COMMIT_DATE, direction: DESC} ) {
+                  totalCount
+                  pageInfo {
+                    endCursor
+                    hasNextPage
+                  }
+                  nodes {
+                    name
+                    target {
+                      __typename ... on Commit {
+                        abbreviatedOid
+                        committedDate
+                      }
+                      ... on Tag {
+                        message tagger {
+                          user {
+                            login
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ' -f owner=${{ github.repository_owner }} -f name=${{ env.REPO_NAME }} -f tag=${{ github.ref_name }} > tag_data.json
+          cat tag_data.json
+          echo ""
+          jq -r '.data.repository.refs.nodes[].target.message' tag_data.json >> message.md
+          cat message.md
+      - name: Download the script from GitHub (without clone)
+        run: |
+          echo "::add-mask::$(gh api repos/${{ github.repository }}/contents/${{ env.TARGET_FILE }}?ref=${{ github.ref_name }} -q '.download_url' --cache 30s | awk '{ split($0, a,"token="); print a[2]}')"
+          wget -O ${{ env.TARGET_FILE }} "$(gh api repos/${{ github.repository }}/contents/${{ env.TARGET_FILE }}?ref=${{ github.ref_name }} -q '.download_url' --cache 30s)"
+          chmod +x ${{ env.TARGET_FILE }}
+      - name: Create release via gh
+        run: |
+          gh release create ${{ github.ref_name }} --verify-tag --repo ${{ github.repository }} -F message.md --title ${{ github.ref_name }} './${{ env.TARGET_FILE }}#${{ env.TARGET_FILE }}'
