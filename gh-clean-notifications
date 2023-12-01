@@ -36,6 +36,7 @@ MARK_IDS_AS_DONE_QUERY="
 "
 
 BASE_QUERY="is:unread is:read"
+STATES='"CLOSED","MERGED"'
 BASE_LIMIT=50
 VERBOSE=0
 
@@ -50,15 +51,16 @@ help() {
   echo "       Same as available here: https://github.com/notifications"
   echo "       Default: is:unread is:read"
   echo " -l -> Limit on pagination. Default 50."
+  echo " -s -> Set the states to mark down as. Default is closed, and merged"
   echo " -v -> Verbose messaging."
 }
 
 process_notifications() {
   data=$(gh api graphql \
-    -F first=${BASE_LIMIT} -F miscQuery="${BASE_QUERY}" \
+    -F first="${BASE_LIMIT}" -F miscQuery="${BASE_QUERY}" \
     -f query="${NOTIFICATION_QUERY}" \
     --paginate \
-    -q '.data.viewer.notificationThreads.nodes[] | select(.subject.state == ("CLOSED","MERGED")) | {"id":.id,"title":.title,"path":.subject.resourcePath}'
+    -q ".data.viewer.notificationThreads.nodes[] | select(.subject.state == (${STATES})) | {\"id\":.id,\"title\":.title,\"path\":.subject.resourcePath}"
   )
 
   readarray -t my_array < <(echo "${data}" | jq -s -c '.[]')
@@ -80,7 +82,7 @@ process_notifications() {
 }
 
 
-while getopts :hq:l:v flag
+while getopts :hq:l:s:v flag
 do
   case "${flag}" in
     h)  # Display help
@@ -102,6 +104,22 @@ do
     v)  # Do verbose messages
       VERBOSE=1;;
 
+    s)  # Process states into a string for jq
+      value=${OPTARG^^}
+      oldIFS=$IFS
+      IFS=','
+      STATES=""
+      values=( "${value}" )
+      IFS=$oldIFS
+
+      for item in "${values[@]}"; do
+        if [ -z "${STATES}" ]; then
+          STATES="\"${item}\""
+        else
+          STATES="${STATES},\"${item}\""
+        fi
+      done;;
+
     \?)
       echo "Error: Invalid option was specified." >&2;
       echo "" >&2
@@ -114,6 +132,7 @@ if [ ${VERBOSE} -gt 0 ]; then
   echo "Input arguments are:"
   echo "Query: ${BASE_QUERY}"
   echo "Limit: ${BASE_LIMIT}"
+  echo "States: ${STATES}"
 fi
 
 process_notifications
