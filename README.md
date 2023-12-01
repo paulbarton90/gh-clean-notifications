@@ -3,6 +3,15 @@
 A small [gh](https://github.com/cli/cli) extension to help cleanup notifications
 for when a pull request or issue is marked as closed or merged.
 
+## Prerequisite
+
+Prior to setting up this tool to be used, you'll need to add the "notifications"
+scope to your gh token. Your token can be refreshed to get the scope via `gh
+auth refresh --scopes notifications`.
+
+The correct scopes can be verified via `gh auth status`. The last line it prints
+informs you of the "Token scopes".
+
 ## Usage
 
 ```shell
