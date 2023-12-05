@@ -43,7 +43,7 @@ VERBOSE=0
 help() {
   echo "gh clean-notifications"
   echo "Cleans up merged and closed items from notifications in github."
-  echo "Syntax: gh clean-notifications [-h|-q|-l]"
+  echo "Syntax: gh clean-notifications [-h|-q|-l|-s|-v]"
   echo ""
   echo "Options:"
   echo " -h -> Help"
