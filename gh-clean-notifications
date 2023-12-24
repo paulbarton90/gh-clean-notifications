@@ -39,6 +39,7 @@ BASE_QUERY="is:unread is:read"
 STATES='"CLOSED","MERGED"'
 BASE_LIMIT=50
 VERBOSE=0
+MIN_GH_VERSION="v2.40"
 
 help() {
   echo "gh clean-notifications"
@@ -52,7 +53,91 @@ help() {
   echo "       Default: is:unread is:read"
   echo " -l -> Limit on pagination. Default 50."
   echo " -s -> Set the states to mark down as. Default is closed, and merged"
+  echo " -c -> Check that gh is correct version, and scopes are set."
   echo " -v -> Verbose messaging."
+}
+
+check() {
+  has_errored=0
+  has_jq=$(which jq)
+  has_jq_exit=$?
+  if [ ${VERBOSE} -gt 0 ]; then
+    echo "Has jq: ${has_jq}"
+  fi
+
+  if [[ $has_jq_exit != "0" ]]; then
+    echo "jq is not installed. Please install jq."
+    has_errored=1
+  fi
+
+  current_gh_ver=$(gh --version | \
+    tail -n 1 | \
+    awk 'match($0, "\/v.*$"){print substr($0,RSTART+1,RLENGTH)}'
+  )
+
+  if [ ${VERBOSE} -gt 0 ]; then
+    echo "Current gh cli version: ${current_gh_ver}"
+  fi
+
+  min_version=$(printf "%s\n%s" "${MIN_GH_VERSION}" "${current_gh_ver}" | \
+    sort --version-sort | \
+    head -n 1
+  )
+  if [ "${min_version}" != "${MIN_GH_VERSION}" ]; then
+    echo "Minimum gh version needs to be ${MIN_GH_VERSION}. You have ${current_gh_ver}."
+    has_errored=1
+  fi
+
+  # Check the scopes of the API key to make sure we can run.
+  scopes_str=$(gh auth status | \
+    grep -i "Token scopes" | \
+    awk '{ gsub(/\047/, "", $0); split($0,s,": "); gsub(/, /, "\n", s[2]); print s[2] }'
+  )
+  readarray -t scopes < <(echo "${scopes_str}")
+
+  org=0
+  notifications=0
+  repo=0
+
+  for scope in "${scopes[@]}"; do
+    case "${scope}" in
+      repo)
+        repo=1;;
+      read:org)
+        org=1;;
+      org)
+        org=1;;
+      notifications)
+        notifications=1;;
+    esac
+  done
+
+  if [ ${VERBOSE} -gt 0 ]; then
+    echo "The scope check returns:"
+    echo "  repo: ${repo}"
+    echo "  org: ${org}"
+    echo "  notification: ${notifications}"
+  fi
+
+  if [ ${notifications} -eq 0 ] || [ ${org} -eq 0 ] || [ ${repo} -eq 0 ]; then
+    has_errored=1
+    echo "gh scopes are wrong. You need to add the following:"
+    if [ ${notifications} -eq 0 ]; then
+      echo "  notifications"
+    fi
+    if [ ${repo} -eq 0 ]; then
+      echo "  repo"
+    fi
+    if [ ${org} -eq 0 ]; then
+      echo "  org:read"
+    fi
+  fi
+
+  if [ ${has_errored} -eq 0 ]; then
+    echo "All OK!"
+  fi
+
+  exit ${has_errored}
 }
 
 process_notifications() {
@@ -82,7 +167,7 @@ process_notifications() {
 }
 
 
-while getopts :hq:l:s:v flag
+while getopts :hq:l:s:vc flag
 do
   case "${flag}" in
     h)  # Display help
@@ -119,6 +204,9 @@ do
           STATES="${STATES},\"${item}\""
         fi
       done;;
+
+    c)
+      check;;
 
     \?)
       echo "Error: Invalid option was specified." >&2;
