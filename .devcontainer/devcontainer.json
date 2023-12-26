@@ -1,5 +1,6 @@
 {
   "name": "devcontainer1",
+  "postCreateCommand": "bash .devcontainer/aliases.sh",
   "customizations": {
     "vscode": {
       "extensions": [
