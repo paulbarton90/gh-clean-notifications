@@ -1,0 +1,19 @@
+{
+  "name": "devcontainer1",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bierner.emojisense"
+      ],
+      "settings": {
+        "editor.tabSize": 4,
+        "[json]": {
+          "editor.tabSize": 2
+        },
+        "[yaml]": {
+          "editor.tabSize": 2
+        }
+      }
+    }
+  }
+}
