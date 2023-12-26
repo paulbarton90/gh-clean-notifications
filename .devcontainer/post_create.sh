@@ -1,5 +1,8 @@
 #!/bin/sh
 
+pip install --user pre-commit
+pre-commit install
+
 # Setup git aliases
 git config alias.d 'diff'
 git config alias.ds 'diff --staged'
