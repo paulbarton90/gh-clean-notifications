@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-
 NOTIFICATION_QUERY="query NotificationsQuery(\$first: Int!, \$endCursor: String, \$miscQuery: String) {
   viewer {
     notificationThreads(first: \$first, after: \$endCursor, query: \$miscQuery) {
@@ -157,8 +156,14 @@ process_notifications() {
       echo "Marking as Done: $(echo "${item}" | jq -r .title)"
       echo "                 https://github.com$(echo "${item}" | jq -r .path)"
       IDS+=(-f "ids[]=$(echo "${item}" | jq -r .id)")
+      if test ${#IDS[@]} -eq 100
+      then
+        gh api graphql --silent "${IDS[@]}" -f query="${MARK_IDS_AS_DONE_QUERY}"
+	IDS=()
+      fi
     done
 
+    test ${#IDS[@]} -eq 0 ||
     gh api graphql --silent "${IDS[@]}" -f query="${MARK_IDS_AS_DONE_QUERY}"
 
   else
