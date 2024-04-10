@@ -13,10 +13,12 @@ The correct scopes can be verified via `gh auth status`. The last line it prints
 informs you of the "Token scopes".
 
 Other requirements:
+
 * `awk`
 * `gh>=2.40`
 * `jq`
 * `sort`
+* `tr`
 
 ## Usage
 

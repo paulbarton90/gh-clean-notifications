@@ -147,21 +147,22 @@ process_notifications() {
     -q ".data.viewer.notificationThreads.nodes[] | select(.subject.state == (${STATES})) | {\"id\":.id,\"title\":.title,\"path\":.subject.resourcePath}"
   )
 
-  readarray -t my_array < <(echo "${data}" | jq -s -c '.[]')
-
-  # If there are IDs, mark them as done.
-  if [ ${#my_array[@]} -gt 0 ]; then
+  if [ ${#data} -gt 0 ]; then
     IDS=()
-    for item in "${my_array[@]}"; do
+    while read -r item; do
       echo "Marking as Done: $(echo "${item}" | jq -r .title)"
       echo "                 https://github.com$(echo "${item}" | jq -r .path)"
       IDS+=(-f "ids[]=$(echo "${item}" | jq -r .id)")
       if test ${#IDS[@]} -eq 100
       then
         gh api graphql --silent "${IDS[@]}" -f query="${MARK_IDS_AS_DONE_QUERY}"
-	IDS=()
+        IDS=()
       fi
-    done
+
+    # Since this indented with spaces, EOT is fully left aligned.
+    done <<EOT
+$(echo "$data" | jq -s -c .[])
+EOT
 
     test ${#IDS[@]} -eq 0 ||
     gh api graphql --silent "${IDS[@]}" -f query="${MARK_IDS_AS_DONE_QUERY}"
@@ -195,7 +196,7 @@ do
       VERBOSE=1;;
 
     s)  # Process states into a string for jq
-      value=${OPTARG^^}
+      value=$(echo "${OPTARG}" | tr '[:lower:]' '[:upper:]')
       oldIFS=$IFS
       IFS=','
       STATES=""
