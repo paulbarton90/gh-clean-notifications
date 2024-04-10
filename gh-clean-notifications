@@ -71,7 +71,7 @@ check() {
 
   current_gh_ver=$(gh --version | \
     tail -n 1 | \
-    awk 'match($0, "\/v.*$"){print substr($0,RSTART+1,RLENGTH)}'
+    awk 'match($0, "\\/v.*$"){print substr($0,RSTART+1,RLENGTH)}'
   )
 
   if [ ${VERBOSE} -gt 0 ]; then
@@ -79,7 +79,7 @@ check() {
   fi
 
   min_version=$(printf "%s\n%s" "${MIN_GH_VERSION}" "${current_gh_ver}" | \
-    sort --version-sort | \
+    sort -V | \
     head -n 1
   )
   if [ "${min_version}" != "${MIN_GH_VERSION}" ]; then
@@ -92,13 +92,12 @@ check() {
     grep -i "Token scopes" | \
     awk '{ gsub(/\047/, "", $0); split($0,s,": "); gsub(/, /, "\n", s[2]); print s[2] }'
   )
-  readarray -t scopes < <(echo "${scopes_str}")
 
   org=0
   notifications=0
   repo=0
 
-  for scope in "${scopes[@]}"; do
+  while read -r scope; do
     case "${scope}" in
       repo)
         repo=1;;
@@ -109,7 +108,7 @@ check() {
       notifications)
         notifications=1;;
     esac
-  done
+  done < <(echo "${scopes_str}")
 
   if [ ${VERBOSE} -gt 0 ]; then
     echo "The scope check returns:"
