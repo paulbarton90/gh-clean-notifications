@@ -3,6 +3,11 @@
 A small [gh](https://github.com/cli/cli) extension to help cleanup notifications
 for when a pull request or issue is marked as closed or merged.
 
+> [!IMPORTANT]
+> It appears that these undocumented api's have now been removed. This means
+> that this extension no longer works as-is. This can be read up on
+> [here](https://github.com/orgs/community/discussions/24653#discussioncomment-16444677).
+
 ## Prerequisite
 
 Prior to setting up this tool to be used, you'll need to add the "notifications"
